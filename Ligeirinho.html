@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Corrida do Ligeirinho</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            font-size: 28px;
+        }
+        
+        canvas {
+            border: 3px solid #fff;
+            border-radius: 8px;
+            display: block;
+            background: #87CEEB;
+            cursor: crosshair;
+        }
+        
+        .controls {
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .control-group {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .control-group h3 {
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #ffd700;
+        }
+        
+        .control-item {
+            margin: 6px 0;
+            font-size: 12px;
+        }
+        
+        .control-item label {
+            display: inline-block;
+            width: 120px;
+        }
+        
+        input[type="range"] {
+            width: 150px;
+            vertical-align: middle;
+        }
+        
+        input[type="color"] {
+            width: 50px;
+            height: 25px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .info {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 13px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+        }
+        
+        .catch-button {
+            display: block;
+            margin: 10px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+            transition: all 0.3s;
+        }
+        
+        .catch-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+        
+        .catch-button:active {
+            transform: translateY(0);
+        }
+        
+        #catchMessage {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+            min-height: 25px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐭 A Corrida do Ligeirinho 🧀</h1>
+        
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="catchMessage"></div>
+        
+        <button class="catch-button" id="catchBtn">🐾 Tentar Pegar o Ligeirinho!</button>
+        
+        <div class="controls">
+            <div class="control-group">
+                <h3>⌨️ Controles da Câmera</h3>
+                <div class="control-item">WASD ou Setas: Mover câmera</div>
+                <div class="control-item">+/-: Zoom in/out</div>
+                <div class="control-item">Clique: Teletransportar câmera</div>
+            </div>
+            
+            <div class="control-group">
+                <h3>💡 Iluminação (Modelo de Phong)</h3>
+                <div class="control-item">
+                    <label>Intensidade:</label>
+                    <input type="range" id="lightIntensity" min="0" max="2" step="0.1" value="1">
+                    <span id="intensityValue">1.0</span>
+                </div>
+                <div class="control-item">
+                    <label>Direção X:</label>
+                    <input type="range" id="lightDirX" min="-1" max="1" step="0.1" value="0.5">
+                    <span id="dirXValue">0.5</span>
+                </div>
+                <div class="control-item">
+                    <label>Direção Y:</label>
+                    <input type="range" id="lightDirY" min="-1" max="1" step="0.1" value="-0.5">
+                    <span id="dirYValue">-0.5</span>
+                </div>
+                <div class="control-item">
+                    <label>Cor da Luz:</label>
+                    <input type="color" id="lightColor" value="#ffffff">
+                </div>
+            </div>
+        </div>
+        
+        <div class="info">
+            <strong>Espaço Virtual:</strong> 1600x1200 | <strong>Câmera:</strong> 800x600 | 
+            <strong>Posição:</strong> <span id="cameraPos">X: 0, Y: 0</span> | 
+            <strong>🏆 Capturas:</strong> <span id="catchCounter">0</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Configurações do mundo virtual
+        const VIRTUAL_WIDTH = 1600;
+        const VIRTUAL_HEIGHT = 1200;
+        const CAMERA_WIDTH = 800;
+        const CAMERA_HEIGHT = 600;
+        
+        // Estado da câmera
+        let camera = {
+            x: 0,
+            y: 0,
+            zoom: 1,
+            speed: 5
+        };
+        
+        // Iluminação (Modelo de Phong)
+        let light = {
+            direction: { x: 0.5, y: -0.5, z: -1 },
+            color: { r: 255, g: 255, b: 255 },
+            intensity: 1.0,
+            ambient: 0.3,
+            diffuse: 0.7,
+            specular: 0.5,
+            shininess: 32
+        };
+        
+        // Ligeirinho (Speedy Gonzales)
+        let speedy = {
+            x: 400,
+            y: 300,
+            angle: 0,
+            speed: 5,
+            targetX: 400,
+            targetY: 300,
+            size: 30,
+            color: { r: 139, g: 69, b: 19 },
+            caught: false
+        };
+        
+        // Contador de capturas
+        let catchCount = 0;
+        
+        // Controles do teclado
+        let keys = {};
+        
+        // Objetos estáticos no cenário
+        const obstacles = [
+            { x: 300, y: 200, width: 80, height: 80, color: { r: 139, g: 90, b: 43 } },
+            { x: 800, y: 400, width: 100, height: 60, color: { r: 105, g: 105, b: 105 } },
+            { x: 1200, y: 600, width: 120, height: 100, color: { r: 160, g: 82, b: 45 } },
+            { x: 500, y: 900, width: 90, height: 90, color: { r: 128, g: 128, b: 128 } },
+            { x: 1400, y: 300, width: 150, height: 80, color: { r: 101, g: 67, b: 33 } }
+        ];
+        
+        // Função de normalização de vetor
+        function normalize(vec) {
+            const len = Math.sqrt(vec.x * vec.x + vec.y * vec.y + (vec.z || 0) * (vec.z || 0));
+            return len > 0 ? { x: vec.x / len, y: vec.y / len, z: (vec.z || 0) / len } : vec;
+        }
+        
+        // Função de iluminação Phong
+        function applyPhongLighting(baseColor, normalZ = 1) {
+            const normal = normalize({ x: 0, y: 0, z: normalZ });
+            const lightDir = normalize(light.direction);
+            
+            // Componente Ambiente
+            const ambient = {
+                r: baseColor.r * light.ambient,
+                g: baseColor.g * light.ambient,
+                b: baseColor.b * light.ambient
+            };
+            
+            // Componente Difusa (Lambert)
+            const diffuseFactor = Math.max(0, -(lightDir.x * normal.x + lightDir.y * normal.y + lightDir.z * normal.z));
+            const diffuse = {
+                r: baseColor.r * light.diffuse * diffuseFactor * light.intensity,
+                g: baseColor.g * light.diffuse * diffuseFactor * light.intensity,
+                b: baseColor.b * light.diffuse * diffuseFactor * light.intensity
+            };
+            
+            // Componente Especular (Blinn-Phong simplificado)
+            const viewDir = { x: 0, y: 0, z: 1 };
+            const halfVec = normalize({
+                x: lightDir.x + viewDir.x,
+                y: lightDir.y + viewDir.y,
+                z: lightDir.z + viewDir.z
+            });
+            const specFactor = Math.pow(Math.max(0, -(halfVec.x * normal.x + halfVec.y * normal.y + halfVec.z * normal.z)), light.shininess);
+            const specular = {
+                r: light.color.r * light.specular * specFactor * light.intensity,
+                g: light.color.g * light.specular * specFactor * light.intensity,
+                b: light.color.b * light.specular * specFactor * light.intensity
+            };
+            
+            // Combinar componentes
+            return {
+                r: Math.min(255, ambient.r + diffuse.r + specular.r),
+                g: Math.min(255, ambient.g + diffuse.g + specular.g),
+                b: Math.min(255, ambient.b + diffuse.b + specular.b)
+            };
+        }
+        
+        // Transformações afins
+        function translate(x, y, tx, ty) {
+            return { x: x + tx, y: y + ty };
+        }
+        
+        function rotate(x, y, cx, cy, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const dx = x - cx;
+            const dy = y - cy;
+            return {
+                x: cx + dx * cos - dy * sin,
+                y: cy + dx * sin + dy * cos
+            };
+        }
+        
+        function scale(x, y, cx, cy, sx, sy) {
+            return {
+                x: cx + (x - cx) * sx,
+                y: cy + (y - cy) * sy
+            };
+        }
+        
+        // Projeção da câmera (mundo -> tela)
+        function worldToScreen(worldX, worldY) {
+            return {
+                x: (worldX - camera.x) * camera.zoom,
+                y: (worldY - camera.y) * camera.zoom
+            };
+        }
+        
+        // Projeção inversa (tela -> mundo)
+        function screenToWorld(screenX, screenY) {
+            return {
+                x: screenX / camera.zoom + camera.x,
+                y: screenY / camera.zoom + camera.y
+            };
+        }
+        
+        // Desenhar fundo com gradiente
+        function drawBackground() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.7, '#98D8C8');
+            gradient.addColorStop(1, '#90EE90');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Adicionar padrão de chão
+            ctx.fillStyle = 'rgba(34, 139, 34, 0.2)';
+            for (let i = 0; i < VIRTUAL_WIDTH; i += 100) {
+                for (let j = VIRTUAL_HEIGHT * 0.7; j < VIRTUAL_HEIGHT; j += 100) {
+                    const pos = worldToScreen(i, j);
+                    if (pos.x > -50 && pos.x < canvas.width + 50 && pos.y > -50 && pos.y < canvas.height + 50) {
+                        ctx.fillRect(pos.x, pos.y, 50 * camera.zoom, 50 * camera.zoom);
+                    }
+                }
+            }
+        }
+        
+        // Desenhar obstáculos
+        function drawObstacles() {
+            obstacles.forEach(obs => {
+                const pos = worldToScreen(obs.x, obs.y);
+                const w = obs.width * camera.zoom;
+                const h = obs.height * camera.zoom;
+                
+                if (pos.x + w > 0 && pos.x < canvas.width && pos.y + h > 0 && pos.y < canvas.height) {
+                    const litColor = applyPhongLighting(obs.color, 0.8);
+                    ctx.fillStyle = `rgb(${litColor.r}, ${litColor.g}, ${litColor.b})`;
+                    ctx.fillRect(pos.x, pos.y, w, h);
+                    
+                    // Borda
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(pos.x, pos.y, w, h);
+                }
+            });
+        }
+        
+        // Desenhar Ligeirinho
+        function drawSpeedy() {
+            const pos = worldToScreen(speedy.x, speedy.y);
+            const size = speedy.size * camera.zoom;
+            
+            ctx.save();
+            ctx.translate(pos.x, pos.y);
+            ctx.rotate(speedy.angle);
+            
+            // Corpo (com iluminação)
+            const bodyColor = applyPhongLighting(speedy.color, 1);
+            ctx.fillStyle = `rgb(${bodyColor.r}, ${bodyColor.g}, ${bodyColor.b})`;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, size * 0.8, size * 0.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Cabeça
+            const headColor = applyPhongLighting({ r: 160, g: 100, b: 50 }, 1.2);
+            ctx.fillStyle = `rgb(${headColor.r}, ${headColor.g}, ${headColor.b})`;
+            ctx.beginPath();
+            ctx.arc(size * 0.6, 0, size * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Orelhas
+            ctx.fillStyle = `rgb(${headColor.r * 0.9}, ${headColor.g * 0.9}, ${headColor.b * 0.9})`;
+            ctx.beginPath();
+            ctx.ellipse(size * 0.7, -size * 0.4, size * 0.2, size * 0.4, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(size * 0.7, size * 0.4, size * 0.2, size * 0.4, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Olhos
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(size * 0.75, -size * 0.15, size * 0.15, 0, Math.PI * 2);
+            ctx.arc(size * 0.75, size * 0.15, size * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(size * 0.8, -size * 0.15, size * 0.08, 0, Math.PI * 2);
+            ctx.arc(size * 0.8, size * 0.15, size * 0.08, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Nariz
+            ctx.fillStyle = 'pink';
+            ctx.beginPath();
+            ctx.arc(size * 0.95, 0, size * 0.1, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Bigodes
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1.5;
+            for (let i = -1; i <= 1; i++) {
+                ctx.beginPath();
+                ctx.moveTo(size * 0.85, i * size * 0.15);
+                ctx.lineTo(size * 1.2, i * size * 0.2);
+                ctx.stroke();
+            }
+            
+            // Cauda
+            ctx.strokeStyle = `rgb(${bodyColor.r}, ${bodyColor.g}, ${bodyColor.b})`;
+            ctx.lineWidth = size * 0.15;
+            ctx.beginPath();
+            ctx.moveTo(-size * 0.8, 0);
+            ctx.quadraticCurveTo(-size * 1.2, -size * 0.3, -size * 1.4, -size * 0.5);
+            ctx.stroke();
+            
+            // Patas (simplificadas)
+            ctx.fillStyle = `rgb(${bodyColor.r * 0.8}, ${bodyColor.g * 0.8}, ${bodyColor.b * 0.8})`;
+            ctx.beginPath();
+            ctx.arc(-size * 0.3, size * 0.5, size * 0.2, 0, Math.PI * 2);
+            ctx.arc(size * 0.2, size * 0.5, size * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // Indicador de captura
+            if (speedy.caught) {
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size * 1.5, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        
+        // Atualizar posição do Ligeirinho
+        function updateSpeedy() {
+            if (speedy.caught) return;
+            
+            const dx = speedy.targetX - speedy.x;
+            const dy = speedy.targetY - speedy.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < 10) {
+                // Escolher novo alvo aleatório, preferindo ficar na área visível da câmera
+                const cameraCenter = {
+                    x: camera.x + CAMERA_WIDTH / (2 * camera.zoom),
+                    y: camera.y + CAMERA_HEIGHT / (2 * camera.zoom)
+                };
+                
+                // 70% de chance de escolher alvo próximo à área da câmera
+                if (Math.random() < 0.7) {
+                    const offsetX = (Math.random() - 0.5) * CAMERA_WIDTH / camera.zoom;
+                    const offsetY = (Math.random() - 0.5) * CAMERA_HEIGHT / camera.zoom;
+                    speedy.targetX = Math.max(50, Math.min(VIRTUAL_WIDTH - 50, cameraCenter.x + offsetX));
+                    speedy.targetY = Math.max(50, Math.min(VIRTUAL_HEIGHT - 50, cameraCenter.y + offsetY));
+                } else {
+                    // 30% de chance de ir para qualquer lugar
+                    speedy.targetX = Math.random() * (VIRTUAL_WIDTH - 100) + 50;
+                    speedy.targetY = Math.random() * (VIRTUAL_HEIGHT - 100) + 50;
+                }
+            } else {
+                // Mover em direção ao alvo
+                speedy.x += (dx / dist) * speedy.speed;
+                speedy.y += (dy / dist) * speedy.speed;
+                
+                // Atualizar ângulo
+                speedy.angle = Math.atan2(dy, dx);
+            }
+            
+            // Manter dentro dos limites
+            speedy.x = Math.max(50, Math.min(VIRTUAL_WIDTH - 50, speedy.x));
+            speedy.y = Math.max(50, Math.min(VIRTUAL_HEIGHT - 50, speedy.y));
+        }
+        
+        // Atualizar câmera
+        function updateCamera() {
+            if (keys['w'] || keys['ArrowUp']) camera.y -= camera.speed;
+            if (keys['s'] || keys['ArrowDown']) camera.y += camera.speed;
+            if (keys['a'] || keys['ArrowLeft']) camera.x -= camera.speed;
+            if (keys['d'] || keys['ArrowRight']) camera.x += camera.speed;
+            if (keys['+'] || keys['=']) camera.zoom = Math.min(2, camera.zoom + 0.02);
+            if (keys['-'] || keys['_']) camera.zoom = Math.max(0.5, camera.zoom - 0.02);
+            
+            // Limitar câmera
+            camera.x = Math.max(0, Math.min(VIRTUAL_WIDTH - CAMERA_WIDTH / camera.zoom, camera.x));
+            camera.y = Math.max(0, Math.min(VIRTUAL_HEIGHT - CAMERA_HEIGHT / camera.zoom, camera.y));
+            
+            // Atualizar display
+            document.getElementById('cameraPos').textContent = `X: ${Math.round(camera.x)}, Y: ${Math.round(camera.y)}`;
+        }
+        
+        // Loop principal
+        function gameLoop() {
+            updateCamera();
+            updateSpeedy();
+            
+            // Renderizar
+            drawBackground();
+            drawObstacles();
+            drawSpeedy();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Event Listeners
+        document.addEventListener('keydown', e => keys[e.key] = true);
+        document.addEventListener('keyup', e => keys[e.key] = false);
+        
+        canvas.addEventListener('click', e => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            // Verificar se clicou no Ligeirinho (área de clique aumentada em 2x)
+            const speedyPos = worldToScreen(speedy.x, speedy.y);
+            const dist = Math.sqrt((clickX - speedyPos.x) ** 2 + (clickY - speedyPos.y) ** 2);
+            
+            if (dist < speedy.size * camera.zoom * 2 && !speedy.caught) {
+                // Pegou o Ligeirinho!
+                speedy.caught = true;
+                catchCount++;
+                document.getElementById('catchCounter').textContent = catchCount;
+                document.getElementById('catchMessage').textContent = 
+                    `🎉 Você pegou o Ligeirinho! Total: ${catchCount} captura${catchCount > 1 ? 's' : ''}! 🐭`;
+                
+                setTimeout(() => {
+                    speedy.caught = false;
+                    document.getElementById('catchMessage').textContent = '';
+                }, 3000);
+            } else if (!speedy.caught) {
+                // Clicou fora - teletransportar câmera
+                const worldPos = screenToWorld(clickX, clickY);
+                camera.x = worldPos.x - CAMERA_WIDTH / (2 * camera.zoom);
+                camera.y = worldPos.y - CAMERA_HEIGHT / (2 * camera.zoom);
+            }
+        });
+        
+        // Controles de iluminação
+        document.getElementById('lightIntensity').addEventListener('input', e => {
+            light.intensity = parseFloat(e.target.value);
+            document.getElementById('intensityValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('lightDirX').addEventListener('input', e => {
+            light.direction.x = parseFloat(e.target.value);
+            document.getElementById('dirXValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('lightDirY').addEventListener('input', e => {
+            light.direction.y = parseFloat(e.target.value);
+            document.getElementById('dirYValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('lightColor').addEventListener('input', e => {
+            const hex = e.target.value;
+            light.color.r = parseInt(hex.substr(1, 2), 16);
+            light.color.g = parseInt(hex.substr(3, 2), 16);
+            light.color.b = parseInt(hex.substr(5, 2), 16);
+        });
+        
+        // Iniciar
+        gameLoop();
+    </script>
+</body>
+</html>
